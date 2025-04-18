@@ -1,0 +1,95 @@
+/* Style for home page container */
+.home-container {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background: linear-gradient(135deg, #2193b0, #6dd5ed);
+}
+
+/* Navigation Bar Styling */
+.nav-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    position: sticky;
+    background: linear-gradient(135deg, #20788e, #6dd5ed);
+}
+
+.form-header {
+    background: linear-gradient(135deg, #084c5d, #6dd5ed) !important;
+}
+
+/* Motto Box */
+.motto-box {
+    text-align: center;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 50px;
+    border-radius: 10px;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
+    color: white;
+    max-width: 600px;
+}
+
+.motto-box h1 {
+    font-size: 2.5rem;
+    font-weight: bold;
+}
+
+.motto-box p {
+    font-size: 1.2rem;
+    margin-top: 10px;
+}
+
+.header-icons {
+    display: flex;
+    gap: 20px;
+}
+
+.nav-title {
+    font-weight: bolder;
+    font-size: larger;
+}
+
+.header-container {
+    display: flex;
+}
+
+.footer-class {
+    position: sticky;;
+}
+
+.login-header {
+    background: linear-gradient(135deg, #8e44ad, #3498db);
+    padding: 15px;
+    font-size: 1.5rem;
+    border-radius: 8px 8px 0 0;
+}
+
+.card {
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.btn-primary {
+    background-color: #3498db;
+    border: none;
+    font-size: 1.2rem;
+    padding: 10px;
+}
+
+.btn-primary:hover {
+    background-color: #2980b9;
+}
+
+.form-group label {
+    font-weight: bold;
+    color: #333;
+}
+
+.container {
+    max-width: 500px;
+}

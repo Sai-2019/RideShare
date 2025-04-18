@@ -1,0 +1,196 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-5">
+    <div class="profile-container">
+        <!-- Profile Header -->
+        <div class="profile-header text-center">
+            <img src="https://images.rawpixel.com/image_png_800/cHJpdmF0ZS9sci9pbWFnZXMvd2Vic2l0ZS8yMDIzLTAxL3JtNjA5LXNvbGlkaWNvbi13LTAwMi1wLnBuZw.png" alt="Profile Picture" class="profile-pic">
+            <div class="profile-info">
+                <h3>{{ user.name }}</h3>
+                <p class="text-muted">{{ user.email }}</p>
+                <p><i class="fas fa-map-marker-alt"></i> {{ user.location }}</p>
+                {% comment %} <a href="{% url 'dashboard' %}" class="btn btn-edit">✏️ Edit Profile</a> {% endcomment %}
+            </div>
+        </div>
+
+        <!-- 🚗 Booked Rides Section -->
+        <div class="order-history">
+            <h4>🚗 Booked Rides</h4>
+            {% if booked_rides %}
+                {% for ride in booked_rides %}
+                    <div class="order-card d-flex align-items-center">
+                        <div class="order-icon">
+                            <i class="fas fa-car-side"></i>
+                        </div>
+                        <div class="order-details">
+                            <h6>📍 {{ ride.pickup_display }} → {{ ride.dropoff_display }}</h6>
+                            <p><strong>Fare:</strong> ${{ ride.fare }}</p>
+                            <p><i class="fas fa-clock"></i> {{ ride.booked_at }}</p>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p class="text-center text-muted">No booked rides found.</p>
+            {% endif %}
+        </div>
+        <!-- 📌 Saved Addresses Section -->
+        <div class="saved-addresses">
+            <h4>🏡 Saved Addresses</h4>
+            {% if user.addresses %}
+                {% for address in user.addresses %}
+                    <div class="saved-address">
+                        <p><strong>{{ address.name }}</strong></p>
+                        <p>{{ address.street }}, {{ address.city }}</p>
+                        <p>{{ address.state }} - {{ address.zipcode }}</p>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p class="text-center text-muted">No saved addresses found.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Custom Styles -->
+<style>
+    /* Global Styling */
+{% comment %} body {
+    background: linear-gradient(to right, #e3f2fd, #bbdefb);
+    font-family: 'Poppins', sans-serif;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+} {% endcomment %}
+
+/* Profile Card */
+.profile-container {
+    max-width: 950px;
+    font-family: 'Poppins', sans-serif;
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(12px);
+    border-radius: 15px;
+    justify-content: center;
+    align-items: center;
+    padding: 30px;
+    {% comment %} text-align: center; {% endcomment %}
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+    transition: 0.3s;
+}
+
+.profile-container:hover {
+    transform: scale(1.02);
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+}
+
+/* Profile Image */
+.profile-pic {
+    width: 130px;
+    height: 130px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 4px solid white;
+    box-shadow: 0px 3px 8px rgba(0, 0, 0, 0.2);
+    transition: 0.3s;
+}
+
+.profile-pic:hover {
+    transform: rotate(5deg) scale(1.1);
+}
+
+/* Profile Info */
+.profile-info h3 {
+    font-size: 24px;
+    font-weight: bold;
+    margin-top: 10px;
+    color: #333;
+}
+
+.profile-info p {
+    font-size: 15px;
+    color: #555;
+}
+
+/* Buttons */
+.btn-edit {
+    background: linear-gradient(45deg, #007bff, #00d4ff);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 25px;
+    display: inline-block;
+    transition: 0.3s ease-in-out;
+    font-weight: bold;
+    text-decoration: none;
+    box-shadow: 0px 4px 8px rgba(0, 123, 255, 0.3);
+}
+
+.btn-edit:hover {
+    transform: scale(1.05);
+    box-shadow: 0px 6px 12px rgba(0, 123, 255, 0.5);
+}
+
+/* Section Titles */
+.order-history h4, .saved-addresses h4 {
+    font-size: 20px;
+    font-weight: bold;
+    margin-top: 30px;
+    color: #333;
+}
+
+/* Order Cards */
+.order-card {
+    background: rgba(255, 255, 255, 0.8);
+    padding: 15px;
+    border-radius: 10px;
+    box-shadow: 0px 3px 10px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px;
+    transition: 0.3s;
+}
+
+.order-card:hover {
+    transform: scale(1.02);
+    box-shadow: 0px 4px 14px rgba(0, 0, 0, 0.2);
+}
+
+.order-icon {
+    font-size: 30px;
+    color: #007bff;
+    padding-right: 15px;
+}
+
+.order-details h6 {
+    font-size: 18px;
+    font-weight: bold;
+    color: #333;
+}
+
+.order-details p {
+    font-size: 14px;
+}
+
+/* Saved Addresses */
+.saved-address {
+    background: rgba(241, 243, 246, 0.9);
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    transition: 0.3s;
+}
+
+.saved-address:hover {
+    background: rgba(226, 230, 234, 1);
+    transform: scale(1.02);
+}
+
+ .text-muted {
+    color: #d3d9de !important;
+}
+.text-muted p{
+    color: #d3d9de !important;
+}
+
+
+</style>
+{% endblock %}

@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center mt-5">
+        <div class="col-md-6">
+            <div class="card shadow-lg border-0 rounded">
+                <div class="card-header login-header text-white text-center py-4" 
+                     style="background: linear-gradient(135deg, #084c5d, #6dd5ed); border-top-left-radius: 10px; border-top-right-radius: 10px;">
+                    <h2 class="fw-bold mb-0">Login</h2>
+                </div>
+                <div class="card-body p-4">
+                    <form method="POST">
+                        {% csrf_token %}
+                        {{ form.as_p }}
+                        <button type="submit" class="btn btn-primary w-100">Login</button>
+                    </form>
+                    
+                    <div class="text-center mt-4">
+                        <p class="mb-0">Don't have an account? 
+                            <a href="{% url 'register' %}" class="text-decoration-none fw-bold">Sign Up</a>
+                        </p>
+                        <p class="mt-2">
+                            {% comment %} <a href="{% url 'password_reset' %}" class="text-decoration-none">Forgot Password?</a> {% endcomment %}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

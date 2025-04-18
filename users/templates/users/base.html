@@ -1,0 +1,69 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}CarPool{% endblock %}</title>
+    <!-- Google Font for Material UI -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" />
+
+    <!-- Material-UI Icons -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
+
+    <!-- Material-UI Core -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/mui/0.10.1/css/mui.min.css" />
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <head>
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+        <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+        <script src="https://js.stripe.com/v3/"></script>
+    </head>
+    
+</head>
+<body style="background: url('{% static 'images/carpool-bg.jpg' %}')no-repeat center center fixed; background-size: cover;">
+    <nav class= "nav-container">
+        {% if user.is_authenticated %}
+            <a href="{% url 'dashboard' %}" class="mui-btn mui-btn--flat mui-btn--primary"><i class="mui-icon material-icons text-white">home</i></a>
+        {% else %}
+            <a href="{% url 'home' %}" class="mui-btn mui-btn--flat mui-btn--primary"><i class="mui-icon material-icons text-white">home</i></a>
+        {% endif %}
+        <span class="nav-title">CarPool System</span>
+        <div class="mui-container header-container">
+            <div class="header-icons">
+                {% if user.is_authenticated %}
+                    <a href="{% url 'get-my-rides' %}" class="mui-btn mui-btn--flat mui-btn--primary icon-white" title="My Rides">
+                        <i class="material-icons text-white">directions_car</i>
+                    </a>
+                    <a href="{% url 'profile' %}" class="mui-btn mui-btn--flat mui-btn--primary icon-white" title="Profile">
+                        <i class="material-icons text-white">person</i>
+                    </a>
+                    <a href="{% url 'logout' %}" class="mui-btn mui-btn--flat mui-btn--primary icon-white" title="Logout">
+                        <i class="material-icons text-white">logout</i>
+                    </a>
+                {% else %}
+                    <a href="{% url 'login' %}" class="mui-btn mui-btn--flat mui-btn--primary" title="Login">
+                        <i class="material-icons">login</i>
+                    </a>
+                    <a href="{% url 'register' %}" class="mui-btn mui-btn--flat mui-btn--primary" title="Register">
+                        <i class="material-icons">app_registration</i>
+                    </a>
+                {% endif %}
+            
+            </div>
+        </div>
+    </nav>
+    <main>
+        {% block content %}
+        {% endblock %}
+    </main>
+
+    {% comment %} <footer class="footer-class">
+        <p>&copy; 2024 CarPool. All rights reserved.</p>
+    </footer> {% endcomment %}
+</body>
+</html>
