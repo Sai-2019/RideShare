@@ -1,0 +1,233 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container">
+    <h2 class="text-center my-4">Book a Ride</h2>
+
+    <form id="ride-form" method="POST">
+        {% csrf_token %}
+        <!-- Pickup Location -->
+        <div class="form-group mb-3 position-relative">
+            <label for="pickup_location">Pickup Location:</label>
+            <div class="input-group">
+                <input type="text" id="pickup_location" name="pickup_location" class="form-control" required>
+                <button type="button" class="btn btn-info ms-2" onclick="detectLocation()">📍 Detect</button>
+            </div>
+            <input type="hidden" id="pickup_lat" name="pickup_lat">
+            <input type="hidden" id="pickup_lon" name="pickup_lon">
+            <input type="hidden" id="pickup_metadata" name="pickup_metadata">
+            <div id="pickup_suggestions" class="suggestions"></div>
+        </div>
+
+        <!-- Dropoff Location -->
+        <div class="form-group mb-3 position-relative">
+            <label for="dropoff_location">Dropoff Location:</label>
+            <input type="text" id="dropoff_location" name="dropoff_location" class="form-control" required>
+            <input type="hidden" id="dropoff_lat" name="dropoff_lat">
+            <input type="hidden" id="dropoff_lon" name="dropoff_lon">
+            <input type="hidden" id="dropoff_metadata" name="dropoff_metadata">
+            <div id="dropoff_suggestions" class="suggestions"></div>
+        </div>
+
+        <!-- Fare Estimate -->
+        <div class="form-group mb-3">
+            <label for="fare">Fare Estimate $:</label>
+            <input type="number" id="fare" name="fare" class="form-control" readonly>
+        </div>
+
+        <button type="submit" id="confirm-booking" class="btn btn-primary w-100">Confirm Booking</button>
+    </form>
+</div>
+
+<style>
+    .suggestions {
+        position: absolute;
+        background: white;
+        border: 1px solid #ccc;
+        width: 100%;
+        max-height: 150px;
+        overflow-y: auto;
+        z-index: 1000;
+    }
+    .suggestion-item {
+        padding: 8px;
+        cursor: pointer;
+    }
+    .suggestion-item:hover {
+        background: #f0f0f0;
+    }
+    .container {
+        margin-top: 10px;
+        max-width: 800px;
+        color: rgb(9 23 20);
+        border-radius: 20px;
+        backdrop-filter: blur(15px);
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+    }
+    label {
+        font-weight: bold;
+        color: white;
+    }
+    h2 {
+        color: white;
+    }
+</style>
+
+<script>
+    let actualPickupLat, actualPickupLon, actualDropoffLat, actualDropoffLon;
+    let userCountryCode = "IN"; 
+    console.log("User Country Code:", userCountryCode);
+    function fetchRideDetails() {
+        let rideId = "{{ ride.id }}"; 
+        fetch(`/get-ride-details/${rideId}/`)
+            .then(response => response.json())
+            .then(data => {
+                actualPickupLat = parseFloat(data.pickup_metadata.lat);
+                actualPickupLon = parseFloat(data.pickup_metadata.lon);
+                actualDropoffLat = parseFloat(data.dropoff_metadata.lat);
+                actualDropoffLon = parseFloat(data.dropoff_metadata.lon);
+            })
+            .catch(error => console.error("Error fetching ride details:", error));
+    }
+
+    function detectLocation() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(position => {
+                let lat = position.coords.latitude;
+                let lon = position.coords.longitude;
+
+                fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (!isWithin5km(lat, lon, actualPickupLat, actualPickupLon)) {
+                            alert("Your location is more than 5 miles away from the ride's pickup point.");
+                            return;
+                        }
+
+                        document.getElementById("pickup_location").value = data.display_name;
+                        document.getElementById("pickup_lat").value = lat;
+                        document.getElementById("pickup_lon").value = lon;
+                        document.getElementById("pickup_metadata").value = JSON.stringify(data);
+
+                        calculateFare();
+                    })
+                    .catch(error => console.error("Error fetching user location:", error));
+            }, () => {
+                alert("Location access denied.");
+            });
+        } else {
+            alert("Geolocation is not supported by your browser.");
+        }
+    }
+
+    function autocompleteLocation(inputId, suggestionsId, metadataId) {
+        let input = document.getElementById(inputId + "_location");
+        let suggestionsBox = document.getElementById(suggestionsId);
+        let timeout = null;
+
+        input.addEventListener('input', function() {
+            clearTimeout(timeout);
+            let query = this.value.trim();
+            if (query.length < 3) {
+                suggestionsBox.innerHTML = '';
+                suggestionsBox.style.display = "none";  
+                return;
+            }
+
+            timeout = setTimeout(() => {
+                fetch(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=${userCountryCode}&q=${query}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        let suggestions = data.map(item => 
+                            `<div class="suggestion-item" 
+                                  data-lat="${item.lat}" 
+                                  data-lon="${item.lon}" 
+                                  data-json='${JSON.stringify(item)}'>
+                                  ${item.display_name}
+                             </div>`
+                        ).join('');
+                        suggestionsBox.innerHTML = suggestions;
+                        suggestionsBox.style.display = "block";  
+                    })
+                    .catch(error => console.error('Error fetching locations:', error));
+            }, 500);
+        });
+
+        suggestionsBox.addEventListener('click', function(e) {
+            if (e.target.classList.contains('suggestion-item')) {
+                let lat = parseFloat(e.target.getAttribute('data-lat'));
+                let lon = parseFloat(e.target.getAttribute('data-lon'));
+
+                if (inputId === "pickup" && !isWithin5km(lat, lon, actualPickupLat, actualPickupLon)) {
+                    alert("Pickup must be within 5 miles of the actual pickup point.");
+                    return;
+                }
+
+                if (inputId === "dropoff" && !isWithin5km(lat, lon, actualDropoffLat, actualDropoffLon)) {
+                    alert("Dropoff must be within 5 miles of the actual dropoff point.");
+                    return;
+                }
+
+                input.value = e.target.innerText;
+                let metadata = e.target.getAttribute('data-json');
+                document.getElementById(metadataId).value = metadata;
+
+                document.getElementById(inputId + "_lat").value = lat;
+                document.getElementById(inputId + "_lon").value = lon;
+
+                suggestionsBox.innerHTML = '';
+                suggestionsBox.style.display = "none";  
+
+                calculateFare();
+            }
+        });
+
+        document.addEventListener("click", function(event) {
+            if (!input.contains(event.target) && !suggestionsBox.contains(event.target)) {
+                suggestionsBox.innerHTML = '';
+                suggestionsBox.style.display = "none";  
+            }
+        });
+    }
+
+    function isWithin5km(userLat, userLon, actualLat, actualLon) {
+        const R = 6371; // Radius of the Earth in km
+        let dLat = (userLat - actualLat) * Math.PI / 180;
+        let dLon = (userLon - actualLon) * Math.PI / 180;
+
+        let a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(actualLat * Math.PI / 180) * Math.cos(userLat * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+
+        let c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        let distance = R * c;  
+        const miles = distance * 0.621371; // Convert meters to miles
+
+        return miles <= 5;
+    }
+
+    function calculateFare() {
+        let pickupLat = parseFloat(document.getElementById("pickup_lat").value);
+        let pickupLon = parseFloat(document.getElementById("pickup_lon").value);
+        let dropoffLat = parseFloat(document.getElementById("dropoff_lat").value);
+        let dropoffLon = parseFloat(document.getElementById("dropoff_lon").value);
+
+        if (!pickupLat || !dropoffLat) return;
+
+        fetch(`/calculate-fare/?pickup_lat=${pickupLat}&pickup_lon=${pickupLon}&dropoff_lat=${dropoffLat}&dropoff_lon=${dropoffLon}`)
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("fare").value = `${data.fare}`;
+            })
+            .catch(error => console.error("Error calculating fare:", error));
+    }
+    
+    document.addEventListener("DOMContentLoaded", function() {
+        fetchRideDetails();
+        autocompleteLocation('pickup', 'pickup_suggestions', 'pickup_metadata');
+        autocompleteLocation('dropoff', 'dropoff_suggestions', 'dropoff_metadata');
+
+    })
+</script>
+
+
+{% endblock %}

@@ -1,0 +1,203 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container">
+    <form method="POST">
+        {% csrf_token %}
+
+        <!-- Pickup Location -->
+        <div class="form-group mb-3 position-relative">
+            <label for="pickup_location">Pickup Location:</label>
+            <div class="input-group">
+                <input type="text" id="pickup_location" name="pickup_location" class="form-control" placeholder="Enter or select pickup location" required>
+                <button type="button" class="btn btn-secondary"  id="detect_location">📍 Detect</button>
+            </div>
+            <input type="hidden" id="pickup_metadata" name="pickup_metadata">
+            <div id="pickup_suggestions" class="suggestions"></div>
+        </div>
+        <div id="pickup_map" style="height: 300px;"></div>
+
+
+        <!-- Dropoff Location -->
+        <div class="form-group mb-3 position-relative">
+            <label for="dropoff_location">Dropoff Location:</label>
+            <input type="text" id="dropoff_location" name="dropoff_location" class="form-control" placeholder="Enter or select dropoff location" required>
+            <input type="hidden" id="dropoff_metadata" name="dropoff_metadata">
+            <div id="dropoff_suggestions" class="suggestions"></div>
+        </div>
+        <div id="dropoff_map" style="height: 300px;"></div>
+
+        <div class="form-group mb-3">
+            <label for="vehicle_details">Vehicle Details:</label>
+            {{ form.vehicle_details }}
+        </div>
+        <div class="form-group mb-3">
+            <label for="date_time">Date & Time:</label>
+            {{ form.date_time }}
+        </div>
+        <div class="form-group mb-3">
+            <label for="available_seats">Vacant Seats:</label>
+            {{ form.available_seats }}
+        </div>
+        <div class="form-group mb-3">
+            <label for="price">Price per Seat $:</label>
+            {{ form.price }}
+        </div>
+
+        <button type="submit" class="btn btn-primary w-100">Submit Ride</button>
+    </form>
+</div>
+
+<style>
+    .suggestions {
+        position: absolute;
+        background: white;
+        border: 1px solid #ccc;
+        width: 100%;
+        max-height: 150px;
+        overflow-y: auto;
+        z-index: 1000;
+    }
+    .suggestion-item {
+        padding: 8px;
+        cursor: pointer;
+    }
+    .suggestion-item:hover {
+        background: #f0f0f0;
+    }
+    .container {
+        margin-top: 10px;
+        max-width: 800px;
+        color: rgb(9 23 20);
+        border-radius: 20px;
+        backdrop-filter: blur(15px);
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+    }
+    label {
+        font-weight: bold;
+        color: white;
+    }
+</style>
+
+<script>
+    let pickupMap = L.map('pickup_map').setView([20.5937, 78.9629], 5);
+    let dropoffMap = L.map('dropoff_map').setView([20.5937, 78.9629], 5);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(pickupMap);
+    
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(dropoffMap);
+
+    let pickupMarker, dropoffMarker;
+
+    function onMapClick(e, inputId, metadataId, mapType) {
+        let marker = mapType === 'pickup' ? pickupMarker : dropoffMarker;
+        let map = mapType === 'pickup' ? pickupMap : dropoffMap;
+
+        if (marker) map.removeLayer(marker);
+        let newMarker = L.marker(e.latlng).addTo(map);
+        if (mapType === 'pickup') pickupMarker = newMarker;
+        else dropoffMarker = newMarker;
+
+        reverseGeocode(e.latlng.lat, e.latlng.lng, inputId, metadataId);
+    }
+
+    pickupMap.on('click', function(e) { onMapClick(e, 'pickup_location', 'pickup_metadata', 'pickup'); });
+    dropoffMap.on('click', function(e) { onMapClick(e, 'dropoff_location', 'dropoff_metadata', 'dropoff'); });
+
+    function reverseGeocode(lat, lon, inputId, metadataId) {
+        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`)
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById(inputId).value = data.display_name;
+                document.getElementById(metadataId).value = JSON.stringify(data); // Store full location data
+            })
+            .catch(error => console.error('Reverse geocoding error:', error));
+    }
+    function autocompleteLocation(inputId, suggestionsId, metadataId) {
+        let input = document.getElementById(inputId);
+        let suggestionsBox = document.getElementById(suggestionsId);
+        let timeout = null;
+
+        input.addEventListener('input', function() {
+            clearTimeout(timeout);
+            let query = this.value.trim();
+            if (query.length < 3) {
+                suggestionsBox.innerHTML = '';
+                return;
+            }
+            
+            timeout = setTimeout(() => {
+                fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        let suggestions = data.map(item => 
+                            `<div class="suggestion-item" 
+                                  data-lat="${item.lat}" 
+                                  data-lon="${item.lon}" 
+                                  data-json='${JSON.stringify(item)}'>
+                                  ${item.display_name}
+                             </div>`
+                        ).join('');
+                        suggestionsBox.innerHTML = suggestions;
+                    })
+                    .catch(error => console.error('Error fetching locations:', error));
+            }, 500);  // Delay to prevent API rate limits
+        });
+
+        suggestionsBox.addEventListener('click', function(e) {
+            if (e.target.classList.contains('suggestion-item')) {
+                input.value = e.target.innerText;
+                let metadata = e.target.getAttribute('data-json');
+                document.getElementById(metadataId).value = metadata; // Store full JSON data
+
+                let lat = e.target.getAttribute('data-lat');
+                let lon = e.target.getAttribute('data-lon');
+                updateMap(inputId, lat, lon);
+
+                suggestionsBox.innerHTML = ''; // Clear suggestions
+            }
+        });
+    }
+
+    function updateMap(inputId, lat, lon) {
+        let map = inputId === 'pickup_location' ? pickupMap : dropoffMap;
+        let marker = inputId === 'pickup_location' ? pickupMarker : dropoffMarker;
+
+        if (marker) map.removeLayer(marker);
+        let newMarker = L.marker([lat, lon]).addTo(map);
+        map.setView([lat, lon], 12);
+
+        if (inputId === 'pickup_location') pickupMarker = newMarker;
+        else dropoffMarker = newMarker;
+    }
+
+    document.getElementById("detect_location").addEventListener("click", function() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(function(position) {
+                let lat = position.coords.latitude;
+                let lon = position.coords.longitude;
+    
+                // Update map and marker
+                if (pickupMarker) pickupMap.removeLayer(pickupMarker);
+                pickupMarker = L.marker([lat, lon]).addTo(pickupMap);
+                pickupMap.setView([lat, lon], 14);
+    
+                // Reverse Geocode to get Address
+                reverseGeocode(lat, lon, "pickup_location", "pickup_metadata");
+            }, function(error) {
+                alert("Geolocation failed. Please enter your location manually.");
+            });
+        } else {
+            alert("Geolocation is not supported by this browser.");
+        }
+    });
+    
+
+    autocompleteLocation('pickup_location', 'pickup_suggestions', 'pickup_metadata');
+    autocompleteLocation('dropoff_location', 'dropoff_suggestions', 'dropoff_metadata');
+</script>
+
+{% endblock %}

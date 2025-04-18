@@ -1,0 +1,164 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+    <h2 class="text-center">🚗 Ride Navigation</h2>
+    <p class="text-center"><strong>Pickup:</strong> {{ pickup_display }} → <strong>Dropoff:</strong> {{ dropoff_display }}</p>
+
+    <div class="text-center">
+        <button class="btn btn-primary" onclick="detectLocation()">📍 Detect My Location</button>
+        <button class="btn btn-success" onclick="getDirections()">🛣️ Get Directions</button>
+    </div>
+    <div class="text-left mt-4" id="directions-container" style="display: none; height: 150px; overflow: hidden;">
+        <h5>📋 Next Turn:</h5>
+        <div id="next-direction" class="alert alert-info mb-0" role="alert">Loading...</div>
+    </div>
+    
+    
+
+    <!-- Map Container -->
+    <div id="map" style="height: 500px; margin-top: 15px;"></div>
+
+    <p class="text-center mt-3">
+        ⏳ Estimated Time: <span id="travel-time">Loading...</span> |
+        📏 Distance: <span id="distance">Loading...</span>
+    </p>
+</div>
+
+<style>
+    .container {
+        margin-top: 10px;
+        max-width: 800px;
+        color: rgb(9 23 20);
+        border-radius: 20px;
+        backdrop-filter: blur(15px);
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+    }
+    h2, p {
+        font-weight: bold;
+        color: white;
+    }
+    #directions-container {
+        background-color: rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+        padding: 10px;
+        color: white;
+    }
+
+    #next-direction {
+        font-weight: bold;
+        font-size: 1rem;
+        background-color: rgba(0, 123, 255, 0.2);
+        border-left: 4px solid #007bff;
+        color: #f8f9fa;
+    }
+</style>
+
+<!-- Leaflet & OpenRouteService -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+    let pickupLat = {{ pickup_lat }};
+    let pickupLon = {{ pickup_lon }};
+    let dropoffLat = {{ dropoff_lat }};
+    let dropoffLon = {{ dropoff_lon }};
+
+    let map = L.map('map').setView([pickupLat, pickupLon], 13);
+
+    // Load OpenStreetMap
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Markers
+    let pickupMarker = L.marker([pickupLat, pickupLon]).addTo(map).bindPopup("📍 Pickup: {{ pickup_display }}");
+    let dropoffMarker = L.marker([dropoffLat, dropoffLon]).addTo(map).bindPopup("📍 Dropoff: {{ dropoff_display }}");
+
+    let routeLayer; // Store route polyline
+
+    function getDirections() {
+        if (!navigator.geolocation) {
+            alert("Geolocation is not supported by your browser.");
+            return;
+        }
+    
+        navigator.geolocation.getCurrentPosition(position => {
+            let userLat = position.coords.latitude;
+            let userLon = position.coords.longitude;
+    
+            fetch(`https://api.openrouteservice.org/v2/directions/driving-car?api_key=5b3ce3597851110001cf62489138941836a9488189e8dd7caea88ed5&start=${userLon},${userLat}&end=${dropoffLon},${dropoffLat}`)
+            .then(response => response.json())
+            .then(data => {
+                if (!data.features || data.features.length === 0) {
+                    alert("No route found. Please try again.");
+                    return;
+                }
+    
+                let route = data.features[0];
+                let coordinates = route.geometry.coordinates.map(coord => [coord[1], coord[0]]);
+    
+                if (routeLayer) {
+                    map.removeLayer(routeLayer);
+                }
+    
+                routeLayer = L.polyline(coordinates, { color: 'blue', weight: 5, opacity: 0.8 }).addTo(map);
+                map.fitBounds(routeLayer.getBounds());
+    
+                let segment = route.properties.segments[0];
+                let travelTime = (segment.duration / 60).toFixed(2);
+                let distance = ((segment.distance / 1000) * 0.621371).toFixed(2);
+    
+                document.getElementById("travel-time").innerText = `${travelTime} mins`;
+                document.getElementById("distance").innerText = `${distance} miles`;
+    
+                let steps = segment.steps;
+                let directionContainer = document.getElementById("directions-container");
+                let nextDirection = document.getElementById("next-direction");
+    
+                if (steps && steps.length > 0) {
+                    nextDirection.innerText = steps[0].instruction;
+                } else {
+                    nextDirection.innerText = "No directions available.";
+                }
+    
+                directionContainer.style.display = "block";
+    
+                L.marker([userLat, userLon], {
+                    icon: L.icon({
+                        iconUrl: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png',
+                        iconSize: [30, 30]
+                    })
+                })
+                .addTo(map)
+                .bindPopup("📍 You are here")
+                .openPopup();
+            })
+            .catch(error => {
+                console.error("Error fetching route:", error);
+                alert("Failed to fetch directions. Please try again.");
+            });
+    
+        }, error => {
+            alert("Failed to get your location. Please allow location access.");
+        });
+    }
+    
+    
+
+    // Auto-detect User Location
+    function detectLocation() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(position => {
+                let userLat = position.coords.latitude;
+                let userLon = position.coords.longitude;
+
+                L.marker([userLat, userLon], { color: "green" }).addTo(map)
+                    .bindPopup("📍 You are here").openPopup();
+
+                map.setView([userLat, userLon], 14);
+            });
+        } else {
+            alert("Geolocation is not supported by your browser.");
+        }
+    }
+</script>
+{% endblock %}

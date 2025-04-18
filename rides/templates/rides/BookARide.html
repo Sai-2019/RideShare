@@ -1,0 +1,250 @@
+{% extends 'base.html' %}
+{% block content %}
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book a Ride</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <div class="container" style = "color: white background-color: #084c5d;">
+        <h2 class="text-center my-4">Book A Ride</h2>
+        
+        <div class="form-group mb-2 position-relative">
+            <label for="search_location">Enter Location:</label>
+            <div class="input-group">
+                <input type="text" id="search_location" class="form-control" placeholder="Enter pickup location">
+                {% comment %} <button type="button" class="btn btn-info ms-2" onclick="detectUserLocation()">📍 Detect</button> {% endcomment %}
+            </div>
+            <input type="hidden" id="search_lat">
+            <input type="hidden" id="search_lon">
+            <div id="location_suggestions" class="suggestions"></div>
+        </div>
+
+
+        <!-- Fetch Rides Button -->
+        <button id="search-btn" class="btn btn-primary w-100 mb-3">Search Rides</button>
+
+        <div class="row" id="rides-container">
+            <!-- Rides will be dynamically inserted here -->
+        </div>
+    </div>
+
+    <style>
+        .suggestions {
+            position: absolute;
+            background: white;
+            border: 1px solid #ccc;
+            width: 100%;
+            max-height: 150px;
+            overflow-y: auto;
+            z-index: 1000;
+        }
+        .suggestion-item {
+            padding: 8px;
+            cursor: pointer;
+        }
+        .suggestion-item:hover {
+            background: #f0f0f0;
+        }
+        .container {
+            margin-top: 10px;
+            max-width: 800px;
+            color: rgb(9 23 20);
+            border-radius: 20px;
+            backdrop-filter: blur(15px);
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+        }
+        h2 {
+            color: white;
+        }
+    </style>
+
+    <script>
+        let allRides = []; // Store all fetched rides
+
+        function detectUserLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(function (position) {
+                    let lat = position.coords.latitude;
+                    let lon = position.coords.longitude;
+
+                    console.log("User Location Detected:", lat, lon);
+
+                    // ✅ Update hidden fields
+                    document.getElementById("search_lat").value = lat;
+                    document.getElementById("search_lon").value = lon;
+
+                    // ✅ Fetch all rides based on detected location
+                    fetchAllRides(lat, lon);
+                }, function (error) {
+                    console.error("Geolocation failed:", error);
+                    fetchAllRides(); // Fetch all rides without filtering
+                });
+            } else {
+                console.error("Geolocation is not supported.");
+                fetchAllRides(); // Fetch all rides without filtering
+            }
+        }
+
+        function autocompleteLocation(inputId, suggestionsId, latId, lonId) {
+            let input = document.getElementById(inputId);
+            let suggestionsBox = document.getElementById(suggestionsId);
+            let timeout = null;
+
+            input.addEventListener("input", function () {
+                clearTimeout(timeout);
+                let query = this.value.trim();
+                if (query.length < 3) {
+                    suggestionsBox.innerHTML = "";
+                    suggestionsBox.style.display = "none";
+                    return;
+                }
+
+                timeout = setTimeout(() => {
+                    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            let suggestions = data.map(item =>
+                                `<div class="suggestion-item" 
+                                    data-lat="${item.lat}" 
+                                    data-lon="${item.lon}">
+                                    ${item.display_name}
+                                </div>`
+                            ).join('');
+                            suggestionsBox.innerHTML = suggestions;
+                            suggestionsBox.style.display = "block";
+                        })
+                        .catch(error => console.error('Error fetching locations:', error));
+                }, 500);
+            });
+
+            suggestionsBox.addEventListener("click", function (e) {
+                if (e.target.classList.contains("suggestion-item")) {
+                    input.value = e.target.innerText;
+
+                    // ✅ Update hidden latitude & longitude fields
+                    document.getElementById(latId).value = e.target.getAttribute("data-lat");
+                    document.getElementById(lonId).value = e.target.getAttribute("data-lon");
+
+                    console.log("Updated Location (Manual Search):", document.getElementById(latId).value, document.getElementById(lonId).value);
+
+                    suggestionsBox.innerHTML = "";
+                    suggestionsBox.style.display = "none";
+
+                    // ✅ Call filterRides() when a location is selected
+                    filterRides();
+                }
+            });
+
+            document.addEventListener("click", function (event) {
+                if (!input.contains(event.target) && !suggestionsBox.contains(event.target)) {
+                    suggestionsBox.innerHTML = "";
+                    suggestionsBox.style.display = "none";
+                }
+            });
+        }
+
+        function fetchAllRides(userLat = null, userLon = null) {
+            fetch('/get-rides/')
+                .then(response => response.json())
+                .then(data => {
+                    allRides = data;
+                    if (userLat && userLon) {
+                        console.log("Filtering rides using detected location:", userLat, userLon);
+                        filterRides(userLat, userLon);
+                    } else {
+                        console.log("Displaying all rides initially.");
+                        displayRides([]);
+                    }
+                })
+                .catch(error => console.error("Error fetching rides:", error));
+        }
+
+        function filterRides(userLat = null, userLon = null) {
+            let lat = userLat || document.getElementById("search_lat").value;
+            let lon = userLon || document.getElementById("search_lon").value;
+
+            console.log("Filtering rides for location:", lat, lon);
+
+            if (!lat || !lon) {
+                alert("Please enter a valid location.");
+                return;
+            }
+
+            let latNum = Number(parseFloat(lat).toFixed(2));
+            let lonNum = Number(parseFloat(lon).toFixed(2));
+
+            let filteredRides = allRides.filter(ride => {
+                let pickupLat = Number(parseFloat(ride.pickup_metadata?.lat).toFixed(2));
+                let pickupLon = Number(parseFloat(ride.pickup_metadata?.lon).toFixed(2));
+
+                console.log(`Distance from (${pickupLat}, ${pickupLon}) to (${latNum}, ${lonNum}):`, getDistance(pickupLat, pickupLon, latNum, lonNum), "miles");
+
+                return getDistance(pickupLat, pickupLon, latNum, lonNum) <= 8.5;
+            });
+
+            displayRides(filteredRides);
+        }
+
+        function displayRides(rides) {
+            let container = document.getElementById("rides-container");
+            container.innerHTML = "";
+
+            if (rides.length === 0) {
+                container.innerHTML = "<p class='text-center'>No rides available.</p>";
+                return;
+            }
+
+            rides.forEach(ride => {
+                let rideCard = `
+                    <div class="col-md-4">
+                        <div class="card shadow-lg mb-4">
+                            <div class="card-body">
+                                <h5 class="card-text">Source: ${(ride.pickup_metadata?.display_name).split(',').slice(0,2).join(',')}</h5>
+                                <h5 class="card-text">Destination: ${ride.dropoff_metadata?.display_name.split(',').slice(0,2).join(',')}</h5>
+                                <p class="card-text">Date: ${ride.date_time}</p>
+                                <p class="card-text">Seats Available: ${ride.available_seats}</p>
+                                <p class="card-text">Price $: ${ride.price}</p>
+                                <a href="/book-ride/${ride.id}/" class="btn btn-primary w-100">Book Ride</a>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.innerHTML += rideCard;
+            });
+        }
+
+        function getDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371000; // Earth radius in meters
+            const toRad = (deg) => deg * (Math.PI / 180);
+
+            const dLat = toRad(lat2 - lat1);
+            const dLon = toRad(lon2 - lon1);
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+                    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            const d = R * c;
+            const miles = d * 0.000621371; // Convert meters to miles
+            return miles;
+        }
+
+        document.addEventListener("DOMContentLoaded", function () {
+            detectUserLocation(); // Auto-detect user location on load
+
+            autocompleteLocation('search_location', 'location_suggestions', 'search_lat', 'search_lon');
+
+            document.getElementById("search-btn").addEventListener("click", function () {
+                console.log("Manual search triggered...");
+                filterRides();
+            });
+        });
+
+    </script>
+</body>
+</html>
+
+{% endblock %}
